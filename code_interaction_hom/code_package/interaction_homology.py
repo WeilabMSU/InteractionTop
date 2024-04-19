@@ -32,7 +32,6 @@ def timeit(func):
         result = func(*args, **kwargs)
         end_time = time.perf_counter()
         total_time = end_time - start_time
-        # print(f"{'='*5} Function {func.__name__}{args} {kwargs} Took {total_time:.3f} seconds {'='*5}")
         print(f"{'='*5} Function - {func.__name__} - took {total_time:.3f} seconds {'='*5}")
         return result
     return timeit_wrapper
@@ -42,7 +41,6 @@ class SimplicialComplexInteractionHomology(object):
     def __init__(self, eigenvalue_method='numpy_eigvalsh', eigvalue_num_limit=None):
         self.distance_matrix = None
         if eigenvalue_method == 'numpy_eigvalsh':
-            # for symmetric or Hermitian matrix
             self.eigvalue_calculator = np.linalg.eigvalsh
 
     def utils_powersets(self, nodes: list, max_dim: int = 2) -> dict:
@@ -66,21 +64,16 @@ class SimplicialComplexInteractionHomology(object):
         adjacent_matrix = ((
             (distance_matrix <= max_threshold_dis) * max_adjacent_matrix + min_adjacent_matrix) > 0)
 
-        # Number of nodes in the graph
         n = adjacent_matrix.shape[0]
-        # List of simplices in the clique complex
         simplicial_complex = {dim: [] for dim in range(max_dim+1)}
-        # List of forming distance simplices in the clique complex
         simplicial_complex_form_distance = {dim: [] for dim in range(max_dim+1)}
 
-        # Add n-dimensional simplices corresponding to cliques
         target_dim = min(max_dim, n)
         for k in range(0, target_dim+1):
             for S in itertools.combinations(range(n), k+1):
                 if all(adjacent_matrix[i,j] for i in S for j in S if i < j):
                     max_local_distance = np.max([distance_matrix[d_i,d_j] for d_i in S for d_j in S])
 
-                    # re-index
                     if overlap_indices is not None:
                         S = tuple([s_ele if s_ele in overlap_indices else s_ele + add_idx for s_ele in S])
                     simplicial_complex[k].append(tuple(S))
@@ -122,15 +115,12 @@ class SimplicialComplexInteractionHomology(object):
 
     def interaction_complex_to_boundary_matrix(self, interaction_complex: dict) -> dict:
         
-        # initial
         boundary_matrix_dict = {dim_n: None for dim_n in interaction_complex.keys()}
         for dim_n in sorted(interaction_complex.keys()):
-            # for dim_0, boundary matrix shape
             if dim_n == 0:
                 boundary_matrix_dict[0] = np.zeros([1, len(interaction_complex[0])])
                 continue
 
-            # for dim >= 1
             interaction_simplex_dim_n = interaction_complex[dim_n]
             interaction_simplex_dim_n_minus_1 = interaction_complex[dim_n-1]
             dim_n_minus_1_index_dict = {sim: sim_idx for sim_idx, sim in enumerate(interaction_simplex_dim_n_minus_1)}
@@ -141,27 +131,22 @@ class SimplicialComplexInteractionHomology(object):
             boundary_matrix_dict[dim_n] = np.zeros(
                 [len(interaction_simplex_dim_n_minus_1), len(interaction_simplex_dim_n)])
             for idx_n, interaction_simplex in enumerate(interaction_simplex_dim_n):
-                # (\partial{x} \otimes y) + (-1)^|x| * (x \otimes \partial{y})
                 x = interaction_simplex[0]
                 y = interaction_simplex[1]
 
-                # part 1: (\partial{x} \otimes y)
                 for omitted_n in range(len(x)):
                     omitted_simplex = tuple(np.delete(x, omitted_n))
                     x_y = tuple([omitted_simplex, y])
                     if x_y in interaction_simplex_dim_n_minus_1:
                         omitted_simplex_idx = dim_n_minus_1_index_dict[x_y]
                         boundary_matrix_dict[dim_n][omitted_simplex_idx, idx_n] += (-1)**omitted_n
-                        # boundary_matrix_dict[dim_n][omitted_simplex_idx, idx_n] = 1
                 
-                # part 2: (-1)^|x| * (x \otimes \partial{y})
                 for omitted_n in range(len(y)):
                     omitted_simplex = tuple(np.delete(y, omitted_n))
                     x_y = tuple([x, omitted_simplex])
                     if x_y in interaction_simplex_dim_n_minus_1:
                         omitted_simplex_idx = dim_n_minus_1_index_dict[x_y]
                         boundary_matrix_dict[dim_n][omitted_simplex_idx, idx_n] += (-1)**(len(x)-1+omitted_n)
-                        # boundary_matrix_dict[dim_n][omitted_simplex_idx, idx_n] = 1
 
         self.has_boundary_max_dim = dim_n
         return boundary_matrix_dict
@@ -179,7 +164,7 @@ class SimplicialComplexInteractionHomology(object):
         boundary_matrix = boundary_matrix %2
         _, col_num = boundary_matrix.shape
 
-        pivot_pairs_dict = {} # row_idx: col_idx
+        pivot_pairs_dict = {}
         for j in range(col_num):
             if np.sum(boundary_matrix[:, j]) == 0:
                 continue
@@ -223,7 +208,6 @@ class SimplicialComplexInteractionHomology(object):
         """
             If the inputs are distance matrices, the overlap_indices should be set.
         """
-        # the default data is cloudpoints
         if is_distance_matrix_1:
             distance_matrix_1 = input_data_1
             points_num_1 = distance_matrix_1.shape[0]
@@ -239,7 +223,6 @@ class SimplicialComplexInteractionHomology(object):
         if min_adjacent_matrix_1 is None:
             min_adjacent_matrix_1 = np.zeros([points_num_1, points_num_1], dtype=int)
 
-        # for set 2
         if is_distance_matrix_2:
             distance_matrix_2 = input_data_2
             points_num_2 = distance_matrix_2.shape[0]
@@ -260,7 +243,6 @@ class SimplicialComplexInteractionHomology(object):
         max_threshold_dis_1 = np.max(filtration)
         max_threshold_dis_2 = np.max(filtration)
         
-        # simplex
         if points_num_1 < points_num_2:
             min_adjacent_matrix_1, min_adjacent_matrix_2 = min_adjacent_matrix_2, min_adjacent_matrix_1
             man_adjacent_matrix_1, man_adjacent_matrix_2 = man_adjacent_matrix_2, man_adjacent_matrix_1
@@ -268,20 +250,19 @@ class SimplicialComplexInteractionHomology(object):
         add_idx = np.max([points_num_1, points_num_2])
 
         complex_1, complex_dis_1 = self.max_adjacent_mat_to_complex(
-            distance_matrix_1, max_adjacent_matrix_1, min_adjacent_matrix_1, max_threshold_dis_1, max_dim_1+1)  # complex consicered as the larger set.
+            distance_matrix_1, max_adjacent_matrix_1, min_adjacent_matrix_1, max_threshold_dis_1, max_dim_1+1)
         complex_2, complex_dis_2 = self.max_adjacent_mat_to_complex(
-            distance_matrix_2, max_adjacent_matrix_2, min_adjacent_matrix_2, max_threshold_dis_2, max_dim_2+1, overlap_indices, add_idx)  # re-index complex 2
+            distance_matrix_2, max_adjacent_matrix_2, min_adjacent_matrix_2, max_threshold_dis_2, max_dim_2+1, overlap_indices, add_idx)
         interaction_complex, global_interaction_simplex_form_distance, global_idx_corresponding_dim = self.max_complexes_to_interaction_complex(
             complex_1, complex_dis_1, complex_2, complex_dis_2, interaction_max_dim+1)
         print(interaction_complex)
         boundary_matrix_dict = self.interaction_complex_to_boundary_matrix(interaction_complex)
 
-        # global pivot pairs
         global_idx_c = boundary_matrix_dict[0].shape[-1]
         global_idx_r = 0
-        global_pivot_pair_dict = {}  # row_idx: col_idx
-        global_pivot_row_idx_dict = {}  # row_idx: 1
-        global_pivot_col_idx_dict = {}  # col_idx: 1
+        global_pivot_pair_dict = {}
+        global_pivot_row_idx_dict = {}
+        global_pivot_col_idx_dict = {}
         for dim in range(1, interaction_max_dim+1+1):
             if boundary_matrix_dict[dim] is None:
                 continue
@@ -294,15 +275,13 @@ class SimplicialComplexInteractionHomology(object):
             global_idx_c += cols
             global_idx_r += rows
 
-        # persistent barcode
         persistent_barcode = {dim: [] for dim in range(interaction_max_dim+1)}
         for col_idx, dim in enumerate(global_idx_corresponding_dim):
             if (col_idx not in global_pivot_col_idx_dict) and (dim <= interaction_max_dim):
-                # means all zeros in that column
                 birth_idx = col_idx
                 birth_distance = global_interaction_simplex_form_distance[col_idx]
 
-                if (birth_idx in global_pivot_row_idx_dict):  # means has pivot in row
+                if (birth_idx in global_pivot_row_idx_dict):
                     death_idx = global_pivot_pair_dict[col_idx]
                     death_distance = global_interaction_simplex_form_distance[death_idx]
                     if np.abs(death_distance - birth_distance) < 1e-10:
@@ -319,10 +298,9 @@ class SimplicialComplexInteractionHomology(object):
         """
             Given an adjacency matrix A for an undirected graph, construct the clique complex of the graph.
         """
-        n = adjacent_matrix.shape[0]  # Number of nodes in the graph
-        simplicial_complex = {dim: [] for dim in range(max_dim+1)}  # List of simplices in the clique complex
+        n = adjacent_matrix.shape[0] 
+        simplicial_complex = {dim: [] for dim in range(max_dim+1)}  
 
-        # Add n-dimensional simplices corresponding to cliques
         target_dim = min(max_dim, n)
         for k in range(0, target_dim+1):
             for S in itertools.combinations(range(n), k+1):
@@ -333,7 +311,6 @@ class SimplicialComplexInteractionHomology(object):
         return simplicial_complex
     
     def complexes_to_interaction_complex(self, complex_1: dict, complex_2: dict, max_dim: int = 1) -> dict:
-        ''' overlap_indices: the over lap vertices between two complexes'''
         
         interaction_complex = {dim: [] for dim in range(max_dim+1)}
 
@@ -356,7 +333,6 @@ class SimplicialComplexInteractionHomology(object):
         boundary_matrix_dict = self.interaction_complex_to_boundary_matrix(self.interaction_complex)
 
         betti_numbers = []
-        # betti_num = dim(d{n})-rank(d{n}) - rank(d{n+1})
         for dim_n in range(max_dim+1):
             dn = boundary_matrix_dict[dim_n]
             dn1 = boundary_matrix_dict[dim_n+1]
@@ -373,15 +349,14 @@ class SimplicialComplexInteractionHomology(object):
     ) -> np.array:
         self.max_dim = max_dim
         self.max_boundary_dim = max_dim + 1
-        # node_idx_list = sorted(list(range(adjacent_matrix.shape[0])))
         data_n1 = adjacent_matrix_1.shape[-1]
         data_n2 = adjacent_matrix_2.shape[-1]
         if data_n1 < data_n2:
             adjacent_matrix_1, adjacent_matrix_2 = adjacent_matrix_2, adjacent_matrix_1
         add_idx = np.max([data_n1, data_n2])
 
-        complex_1 = self.adjacent_mat_to_simplex(adjacent_matrix_1, self.max_boundary_dim)  # larger set don't need to re-index
-        complex_2 = self.adjacent_mat_to_simplex(adjacent_matrix_2, self.max_boundary_dim, overlap_indices, add_idx)  # smaller set needs to re-index
+        complex_1 = self.adjacent_mat_to_simplex(adjacent_matrix_1, self.max_boundary_dim)  
+        complex_2 = self.adjacent_mat_to_simplex(adjacent_matrix_2, self.max_boundary_dim, overlap_indices, add_idx) 
 
         self.complex_1 = complex_1
         self.complex_2 = complex_2
@@ -389,7 +364,6 @@ class SimplicialComplexInteractionHomology(object):
         boundary_matrix_dict = self.interaction_complex_to_boundary_matrix(self.interaction_complex)
 
         betti_numbers = []
-        # betti_num = dim(d{n})-rank(d{n}) - rank(d{n+1})
         for dim_n in range(max_dim+1):
             dn = boundary_matrix_dict[dim_n]
             dn1 = boundary_matrix_dict[dim_n+1]
@@ -423,7 +397,6 @@ class SimplicialComplexInteractionHomology(object):
     ) -> np.array:
         self.max_dim = max_dim
         self.max_boundary_dim = max_dim + 1
-        # node_idx_list = sorted(list(range(adjacent_matrix.shape[0])))
         complex_1 = self.adjacent_mat_to_simplex(adjacent_matrix_1, self.max_boundary_dim)
         complex_2 = self.adjacent_mat_to_simplex(adjacent_matrix_2, self.max_boundary_dim)
         interaction_complex = self.complexes_to_interaction_complex(complex_1, complex_2, self.max_boundary_dim)
@@ -432,7 +405,6 @@ class SimplicialComplexInteractionHomology(object):
 
         laplacian_eigenv = {}
         for dim_n in range(self.max_dim+1):
-        # for dim_n, laplacian_matrix in laplacian_matrix_dict.items():
             if dim_n in laplacian_matrix_dict:
                 laplacian_matrix = laplacian_matrix_dict[dim_n]
                 eig_value = self.eigvalue_calculator(laplacian_matrix)
@@ -453,7 +425,6 @@ class SimplicialComplexInteractionHomology(object):
 
         laplacian_eigenv = {}
         for dim_n in range(self.max_dim+1):
-        # for dim_n, laplacian_matrix in laplacian_matrix_dict.items():
             if dim_n in laplacian_matrix_dict:
                 laplacian_matrix = laplacian_matrix_dict[dim_n]
                 eig_value = self.eigvalue_calculator(laplacian_matrix)
@@ -481,7 +452,6 @@ def main():
         overlap_indices=overlap_indices,
     )
 
-    # print(persistent_barcode)
     for k, v in persistent_barcode.items():
         print(f'dim: {k}', np.round(v, 3))
     return None
